@@ -65,8 +65,10 @@ import org.json.JSONException
 import org.json.JSONObject
 import timber.log.Timber
 import java.io.*
+import java.text.DateFormat
 import java.util.*
 import java.util.concurrent.LinkedBlockingDeque
+import java.util.concurrent.TimeUnit
 import java.util.function.Consumer
 import java.util.regex.Pattern
 import kotlin.math.max
@@ -1080,6 +1082,7 @@ open class Collection(
         return _renderQA(cid, model, did, ord, tags, flist, flags, false, null, null)
     }
 
+    @SuppressLint("DirectSystemCurrentTimeMillisUsage")
     @RustCleanup("#8951 - Remove FrontSide added to the front")
     fun _renderQA(
         cid: CardId,
@@ -1109,6 +1112,10 @@ open class Collection(
         fields["Deck"] = decks.name(did)
         val baseName = Decks.basename(fields["Deck"]!!)
         fields["Subdeck"] = baseName
+        val curTime = System.currentTimeMillis()
+        val lastReviewTime = db.queryLongScalar("select max(id) from revlog where cid = ?", cid)
+        fields["DaysSinceLastReview"] = TimeUnit.MILLISECONDS.toDays(curTime - lastReviewTime).toString()
+        fields["LastReview"] = sDateTimeFormat.format(lastReviewTime)
         fields["CardFlag"] = _flagNameFromCardFlags(flags)
         val template: JSONObject = if (model.isStd) {
             model.getJSONArray("tmpls").getJSONObject(ord)
@@ -2565,6 +2572,8 @@ open class Collection(
         private var sChunk = 0
 
         private const val SQLITE_WINDOW_SIZE_KB = 2048
+        private val sDateFormat = DateFormat.getDateInstance()
+        private val sDateTimeFormat = DateFormat.getDateTimeInstance()
     }
 }
 
